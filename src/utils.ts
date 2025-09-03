@@ -15,21 +15,35 @@ const REGEX =
 
 export function parseTemplate(rawHTML: string, object: object) {
   return rawHTML.replace(REGEX, (...args) => {
-    let {Path , True , False} = args.at(-1) as { Path: string; True: string; False: string };
-    if(!True){True = ''}
-    if(!False){False = ''}
+    let { Path, True, False } = args.at(-1) as {
+      Path: string;
+      True: string;
+      False: string;
+    };
+    if (!True) {
+      True = "";
+    }
+    if (!False) {
+      False = "";
+    }
     const props = Path.split(".");
-    let target : object|string = object;
+    let target: object | string = object;
     for (let prop of props) {
       if (typeof target === "object") {
-        target = (prop in target) ? (target as {[prop]:any})[prop] : "";
+        target = prop in target ? (target as { [prop]: any })[prop] : "";
       }
     }
+    let value = maybeCall(target);
     if (True || False) {
-      target = target ? True : False;
+      value = value ? True : False;
     }
-    return `${target}`;
+    return `${value}`;
   });
 }
 
-
+function maybeCall(k: any) {
+  if (typeof k == "function") {
+    return k();
+  }
+  return k;
+}

@@ -138,10 +138,10 @@ export function Factory<T extends object>(
       return new Proxy(initialState, handler);
     }
 
-    updateDynamicField(property: string) {
+    updateDynamicField(pathName: string) {
       let toUpdate = []
       for (const key in this.dynamicFields){
-        if(property.startsWith(key)){
+        if(key.startsWith(pathName)){
           toUpdate.push(...this.dynamicFields[key])
         }
       }
@@ -173,7 +173,7 @@ export function Factory<T extends object>(
           });
         }
       }
-      options?.onRender?.bind(this)(property);
+      options?.onRender?.bind(this)(pathName);
     }
     initialRender() {
       /* Import template */
