@@ -1,13 +1,9 @@
 {
   "compilerOptions": {
     "outDir": "dist/types",
-    "module": "ESNext",
-    "target": "ES6",
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
-    "jsx": "react-jsx",
+    "module": "es2022",
+    "target": "ES2018",
+    "lib": ["ES2022" , "DOM"],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

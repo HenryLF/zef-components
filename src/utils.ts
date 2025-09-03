@@ -10,15 +10,27 @@ export function getId() {
     .padStart(3, "0")}`;
 }
 
-export function importDataSrc(target: Element | Document | ShadowRoot) {
-  target.querySelectorAll("[data-src]").forEach((element) => {
-    const src = element.getAttribute("data-src")!;
-    element.setAttribute("src", src);
+const REGEX =
+  /\{\{(?<Path>[a-z0-9\.]*)(?:\?)?(['"`]?(?<True>[a-z0-9\s]+)['"`]?)?(?::)?(['"`]?(?<False>[a-z0-9\s]+['"`]?))?\}\}/gi;
+
+export function parseTemplate(rawHTML: string, object: object) {
+  return rawHTML.replace(REGEX, (...args) => {
+    let {Path , True , False} = args.at(-1) as { Path: string; True: string; False: string };
+    if(!True){True = ''}
+    if(!False){False = ''}
+    const props = Path.split(".");
+    let target : object|string = object;
+    for (let prop of props) {
+      if (typeof target === "object") {
+        target = (prop in target) ? (target as {[prop]:any})[prop] : "";
+        console.log(prop , target)
+      }
+    }
+    if (True || False) {
+      target = target ? True : False;
+    }
+    return `${target}`;
   });
 }
 
-export function parseTemplate(rawHTML: string, object: Record<string, any>) {
-  return rawHTML.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-    return object[key]?.toString() || "";
-  });
-}
+

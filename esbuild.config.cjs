@@ -4,8 +4,7 @@ const { build } = require("esbuild");
 const commonConfig = {
   bundle: true,
   minify: true,
-  external: ["react", "react-dom"],
-  entryPoints: ["src/index.ts", "src/hooks/*.ts"],
+  entryPoints: ["src/index.ts"],
   platform: "node",
 };
 

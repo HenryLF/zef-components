@@ -15,6 +15,8 @@ export function Factory<T extends object>(
     rawHTML: string;
     root: ShadowRoot | HTMLElement;
     state: T;
+    readonly name: string = name;
+
     /*value field for input-like behavior */
     private _value: any;
     get value() {
@@ -111,19 +113,20 @@ export function Factory<T extends object>(
 
     createReactiveState<T extends object>(initialState: T) {
       const handler = {
-        get: (target: T, property: string) => {
+        get: (target: T, property: keyof T) => {
           if (
             typeof target[property] === "object" &&
             target[property] !== null
           ) {
+            //@ts-expect-error
             return new Proxy(target[property], handler);
           }
           return target[property];
         },
-        set: (target: T, property: string, value: any) => {
+        set: (target: T, property: keyof T, value: any) => {
           if (target[property] == value) return true;
           target[property] = value;
-          this.updateDynamicField(property);
+          this.updateDynamicField(property as string);
           const newValue = this.boundValueUpdater();
           if (this.value != newValue) {
             this.value = this.boundValueUpdater();
@@ -136,7 +139,7 @@ export function Factory<T extends object>(
     }
 
     updateDynamicField(property: string) {
-      const toUpdate = this.dynamicFields[property];
+      const toUpdate = this.dynamicFields?.[property];
       if (!toUpdate) return;
       for (let { id, raw } of toUpdate) {
         /*fetch element by internal id*/
@@ -196,7 +199,7 @@ export function Factory<T extends object>(
             ?.split(",")
             .map((e) => e.trim()) ?? [];
         const id = el.getAttribute("internal-id");
-        for (let attr of dataAttr) {
+        for (let attr  of dataAttr) {
           if (!this.dynamicFields[attr]) {
             this.dynamicFields[attr] = [];
           }
@@ -219,9 +222,13 @@ export function Factory<T extends object>(
     connectedMoveCallback() {
       console.log("Custom move-handling logic here.");
     }
-    attributeChangedCallback(name: string, oldValue: string, newValue: string) {
-      console.log(name);
-      options?.onAttributeChange?.bind(this)(name, oldValue, newValue);
+    attributeChangedCallback(
+      attrName: string,
+      oldValue: string,
+      newValue: string
+    ) {
+      console.log(attrName);
+      options?.onAttributeChange?.bind(this)(attrName, oldValue, newValue);
     }
   }
   customElements.define(name, Component);

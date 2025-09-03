@@ -8,27 +8,29 @@ export type EventListernerRecord<T extends object> = Record<
   EventHandle<T>[]
 >;
 
-export type DynamicFieldsRecord<T> =
-  | Record<keyof T, { id: string; raw: string }[]>
-  | {};
+export type DynamicFieldsRecord<T extends object> = Record<
+  keyof T | string,
+  { id: string; raw: string }[]
+>;
 
-export class BaseComponent<T extends object, K = unknown> extends HTMLElement {
+export interface BaseComponent<T extends object, K = unknown>
+  extends HTMLElement {
   rawHTML: string;
-  root: ShadowRoot;
+  root: ShadowRoot | HTMLElement;
   name: string;
   state: T;
   readonly value: K;
-  $: (css: string) => HTMLElement | null;
-  $$: (css: string) => HTMLElement[] | null;
+  $: (css: string) => Element | null;
+  $$: (css: string) => NodeListOf<Element>;
   destroy: () => void;
 }
 
 export interface FactoryOptions<T extends object> {
-  state?: T | ((this: Omit<BaseComponent<T>, "state">) => T);
+  state?: T | ((this: BaseComponent<T>) => T);
   value?: (this: BaseComponent<T>) => any;
   onMount?: (this: BaseComponent<T>) => void;
   onUnMount?: (this: BaseComponent<T>) => void;
-  onRender?: (this: Omit<BaseComponent<T>, "state"> & {readonly state : T} , property : keyof T) => void;
+  onRender?: (this: BaseComponent<T>, property: keyof T) => void;
   eventListener?: EventListernerRecord<T>;
   wrapperElement?: keyof HTMLElementTagNameMap | "none";
   noShadow?: true;
@@ -38,5 +40,5 @@ export interface FactoryOptions<T extends object> {
     oldValue?: string,
     newValue?: string
   ) => void;
-  observedAttibutes?:string[]
+  observedAttibutes?: string[];
 }

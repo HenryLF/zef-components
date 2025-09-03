@@ -1,0 +1,32 @@
+{
+  "name": "zef-components",
+  "version": "1.0.0",
+  "description": "no dependency web component factory",
+  "module": "dist/esm/index.js",
+  "main": "dist/cjs/index.js",
+  "types": "dist/types/index.d.ts",
+  "scripts": {
+    "build": "node esbuild.config.cjs && tsc"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./types": "./dist/types/types.d.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HenryLF/zef-components.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/HenryLF/zef-components/issues"
+  },
+  "homepage": "https://github.com/HenryLF/zef-components#readme",
+  "devDependencies": {
+    "esbuild": "^0.25.9"
+  }
+}
