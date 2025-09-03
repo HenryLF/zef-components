@@ -215,9 +215,9 @@ export function Factory<T extends object>(
       this.attachListener();
     }
 
-    connectedCallback() {
+    async connectedCallback() {
       this.initialRender();
-      options?.onMount?.bind(this)();
+      await options?.onMount?.bind(this)();
     }
     disconnectedCallback() {
       options?.onUnMount?.bind(this)();

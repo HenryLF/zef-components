@@ -28,8 +28,8 @@ export interface BaseComponent<T extends object, K = unknown>
 export interface FactoryOptions<T extends object> {
   state?: T | ((this: BaseComponent<T>) => T);
   value?: (this: BaseComponent<T>) => any;
-  onMount?: (this: BaseComponent<T>) => void;
-  onUnMount?: (this: BaseComponent<T>) => void;
+  onMount?:  (this: BaseComponent<T>) => void   | Promise<void>;
+  onUnMount?:  (this: BaseComponent<T>) => void;
   onRender?: (this: BaseComponent<T>, property: keyof T) => void;
   eventListener?: EventListernerRecord<T>;
   wrapperElement?: keyof HTMLElementTagNameMap | "none";
