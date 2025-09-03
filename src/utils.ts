@@ -11,7 +11,7 @@ export function getId() {
 }
 
 const REGEX =
-  /\{\{(?<Path>[a-z0-9\.]*)(?:\?)?(['"`]?(?<True>[a-z0-9\s]+)['"`]?)?(?::)?(['"`]?(?<False>[a-z0-9\s]+['"`]?))?\}\}/gi;
+  /\{\{(?<Path>[a-z0-9\.]*)(?:\?)?(['"`](?<True>[^'"`]*)['"`])?(?::)?(['"`](?<False>[^'"`]*)['"`])?\}\}/gi;
 
 export function parseTemplate(rawHTML: string, object: object) {
   return rawHTML.replace(REGEX, (...args) => {
@@ -23,7 +23,6 @@ export function parseTemplate(rawHTML: string, object: object) {
     for (let prop of props) {
       if (typeof target === "object") {
         target = (prop in target) ? (target as {[prop]:any})[prop] : "";
-        console.log(prop , target)
       }
     }
     if (True || False) {

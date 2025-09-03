@@ -1,0 +1,162 @@
+diff --git a/src/index.ts b/src/index.ts
+index 0fb6ba3..a343d1b 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -15,6 +15,8 @@ export function Factory<T extends object>(
+     rawHTML: string;
+     root: ShadowRoot | HTMLElement;
+     state: T;
++    readonly name: string = name;
++
+     /*value field for input-like behavior */
+     private _value: any;
+     get value() {
+@@ -111,19 +113,20 @@ export function Factory<T extends object>(
+ 
+     createReactiveState<T extends object>(initialState: T) {
+       const handler = {
+-        get: (target: T, property: string) => {
++        get: (target: T, property: keyof T) => {
+           if (
+             typeof target[property] === "object" &&
+             target[property] !== null
+           ) {
++            //@ts-expect-error
+             return new Proxy(target[property], handler);
+           }
+           return target[property];
+         },
+-        set: (target: T, property: string, value: any) => {
++        set: (target: T, property: keyof T, value: any) => {
+           if (target[property] == value) return true;
+           target[property] = value;
+-          this.updateDynamicField(property);
++          this.updateDynamicField(property as string);
+           const newValue = this.boundValueUpdater();
+           if (this.value != newValue) {
+             this.value = this.boundValueUpdater();
+@@ -136,7 +139,7 @@ export function Factory<T extends object>(
+     }
+ 
+     updateDynamicField(property: string) {
+-      const toUpdate = this.dynamicFields[property];
++      const toUpdate = this.dynamicFields?.[property];
+       if (!toUpdate) return;
+       for (let { id, raw } of toUpdate) {
+         /*fetch element by internal id*/
+@@ -196,7 +199,7 @@ export function Factory<T extends object>(
+             ?.split(",")
+             .map((e) => e.trim()) ?? [];
+         const id = el.getAttribute("internal-id");
+-        for (let attr of dataAttr) {
++        for (let attr  of dataAttr) {
+           if (!this.dynamicFields[attr]) {
+             this.dynamicFields[attr] = [];
+           }
+@@ -219,9 +222,13 @@ export function Factory<T extends object>(
+     connectedMoveCallback() {
+       console.log("Custom move-handling logic here.");
+     }
+-    attributeChangedCallback(name: string, oldValue: string, newValue: string) {
+-      console.log(name);
+-      options?.onAttributeChange?.bind(this)(name, oldValue, newValue);
++    attributeChangedCallback(
++      attrName: string,
++      oldValue: string,
++      newValue: string
++    ) {
++      console.log(attrName);
++      options?.onAttributeChange?.bind(this)(attrName, oldValue, newValue);
+     }
+   }
+   customElements.define(name, Component);
+diff --git a/src/types.ts b/src/types.ts
+index a50582b..fa1c025 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -8,27 +8,29 @@ export type EventListernerRecord<T extends object> = Record<
+   EventHandle<T>[]
+ >;
+ 
+-export type DynamicFieldsRecord<T> =
+-  | Record<keyof T, { id: string; raw: string }[]>
+-  | {};
++export type DynamicFieldsRecord<T extends object> = Record<
++  keyof T | string,
++  { id: string; raw: string }[]
++>;
+ 
+-export class BaseComponent<T extends object, K = unknown> extends HTMLElement {
++export interface BaseComponent<T extends object, K = unknown>
++  extends HTMLElement {
+   rawHTML: string;
+-  root: ShadowRoot;
++  root: ShadowRoot | HTMLElement;
+   name: string;
+   state: T;
+   readonly value: K;
+-  $: (css: string) => HTMLElement | null;
+-  $$: (css: string) => HTMLElement[] | null;
++  $: (css: string) => Element | null;
++  $$: (css: string) => NodeListOf<Element>;
+   destroy: () => void;
+ }
+ 
+ export interface FactoryOptions<T extends object> {
+-  state?: T | ((this: Omit<BaseComponent<T>, "state">) => T);
++  state?: T | ((this: BaseComponent<T>) => T);
+   value?: (this: BaseComponent<T>) => any;
+   onMount?: (this: BaseComponent<T>) => void;
+   onUnMount?: (this: BaseComponent<T>) => void;
+-  onRender?: (this: Omit<BaseComponent<T>, "state"> & {readonly state : T} , property : keyof T) => void;
++  onRender?: (this: BaseComponent<T>, property: keyof T) => void;
+   eventListener?: EventListernerRecord<T>;
+   wrapperElement?: keyof HTMLElementTagNameMap | "none";
+   noShadow?: true;
+@@ -38,5 +40,5 @@ export interface FactoryOptions<T extends object> {
+     oldValue?: string,
+     newValue?: string
+   ) => void;
+-  observedAttibutes?:string[]
++  observedAttibutes?: string[];
+ }
+diff --git a/src/utils.ts b/src/utils.ts
+index b6e7e13..83c126f 100644
+--- a/src/utils.ts
++++ b/src/utils.ts
+@@ -10,15 +10,26 @@ export function getId() {
+     .padStart(3, "0")}`;
+ }
+ 
+-export function importDataSrc(target: Element | Document | ShadowRoot) {
+-  target.querySelectorAll("[data-src]").forEach((element) => {
+-    const src = element.getAttribute("data-src")!;
+-    element.setAttribute("src", src);
+-  });
+-}
++const REGEX =
++  /\{\{(?<Path>[a-z0-9\.]*)(?:\?)?(['"`](?<True>[^'"`]*)['"`])?(?::)?(['"`](?<False>[^'"`]*)['"`])?\}\}/gi;
+ 
+-export function parseTemplate(rawHTML: string, object: Record<string, any>) {
+-  return rawHTML.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+-    return object[key]?.toString() || "";
++export function parseTemplate(rawHTML: string, object: object) {
++  return rawHTML.replace(REGEX, (...args) => {
++    let {Path , True , False} = args.at(-1) as { Path: string; True: string; False: string };
++    if(!True){True = ''}
++    if(!False){False = ''}
++    const props = Path.split(".");
++    let target : object|string = object;
++    for (let prop of props) {
++      if (typeof target === "object") {
++        target = (prop in target) ? (target as {[prop]:any})[prop] : "";
++      }
++    }
++    if (True || False) {
++      target = target ? True : False;
++    }
++    return `${target}`;
+   });
+ }
++
++

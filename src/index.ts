@@ -85,19 +85,16 @@ export function Factory<T extends object>(
     }
 
     attachListener() {
-      for (let selectors in options?.eventListener) {
-        /* comma split user provided selectors */
-        for (const selector of selectors.split(",")) {
+      for (let selector in options?.eventListener) {
           const css = selector.trim();
           const eventTargets = this.$$(selector.trim());
           /* register each target individualy */
           eventTargets.forEach((target) => {
-            if (!options?.eventListener?.[selectors]) return;
-            for (let handle of options.eventListener[selectors]) {
+            if (!options?.eventListener?.[selector]) return;
+            for (let handle of options.eventListener[selector]) {
               this.registerEventHandler(target, css, handle);
             }
           });
-        }
       }
     }
     removeListener() {
@@ -111,22 +108,25 @@ export function Factory<T extends object>(
       }
     }
 
-    createReactiveState<T extends object>(initialState: T) {
+
+    createReactiveState<T extends object>(initialState: T, path: string = ''): T {
       const handler = {
         get: (target: T, property: keyof T) => {
-          if (
-            typeof target[property] === "object" &&
-            target[property] !== null
-          ) {
-            //@ts-expect-error
-            return new Proxy(target[property], handler);
+          const value = target[property];
+          if (typeof value === "object" && value !== null) {
+            const newPath = path ? `${path}.${property as string}` : property as string;
+            return this.createReactiveState(value, newPath);
           }
-          return target[property];
+          return value;
         },
         set: (target: T, property: keyof T, value: any) => {
-          if (target[property] == value) return true;
+          if (target[property] === value) return true;
+          const newPath = path ? `${path}.${property as string}` : property as string;
           target[property] = value;
-          this.updateDynamicField(property as string);
+          if (typeof value === "object" && value !== null) {
+            target[property] = this.createReactiveState(value, newPath);
+          }
+          this.updateDynamicField(newPath);
           const newValue = this.boundValueUpdater();
           if (this.value != newValue) {
             this.value = this.boundValueUpdater();
@@ -139,8 +139,13 @@ export function Factory<T extends object>(
     }
 
     updateDynamicField(property: string) {
-      const toUpdate = this.dynamicFields?.[property];
-      if (!toUpdate) return;
+      let toUpdate = []
+      for (const key in this.dynamicFields){
+        if(property.startsWith(key)){
+          toUpdate.push(...this.dynamicFields[key])
+        }
+      }
+      console.log(property,toUpdate , this.dynamicFields)
       for (let { id, raw } of toUpdate) {
         /*fetch element by internal id*/
         let element = this.$(`[internal-id=${id}]`);
@@ -152,7 +157,7 @@ export function Factory<T extends object>(
         for (let css in this.boundEventListener) {
           /* search for child event target */
           const eventTargets: Element[] = [
-            ...this.$$(`[internal-id=${id}] ${css}`),
+            ...Array.from(this.$$(`[internal-id=${id}] ${css}`)),
           ];
           /* check if self is event target*/
           if (element.matches(css)) {
@@ -198,7 +203,7 @@ export function Factory<T extends object>(
             .getAttribute("re-render")
             ?.split(",")
             .map((e) => e.trim()) ?? [];
-        const id = el.getAttribute("internal-id");
+        const id = el.getAttribute("internal-id")!;
         for (let attr  of dataAttr) {
           if (!this.dynamicFields[attr]) {
             this.dynamicFields[attr] = [];
