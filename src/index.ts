@@ -145,7 +145,6 @@ export function Factory<T extends object>(
           toUpdate.push(...this.dynamicFields[key])
         }
       }
-      console.log(property,toUpdate , this.dynamicFields)
       for (let { id, raw } of toUpdate) {
         /*fetch element by internal id*/
         let element = this.$(`[internal-id=${id}]`);
@@ -224,15 +223,11 @@ export function Factory<T extends object>(
       options?.onUnMount?.bind(this)();
       this.removeListener();
     }
-    connectedMoveCallback() {
-      console.log("Custom move-handling logic here.");
-    }
     attributeChangedCallback(
       attrName: string,
       oldValue: string,
       newValue: string
     ) {
-      console.log(attrName);
       options?.onAttributeChange?.bind(this)(attrName, oldValue, newValue);
     }
   }
