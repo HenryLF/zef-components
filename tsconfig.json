@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "outDir": "dist/types",
+    "module": "es2022",
+    "target": "ES2018",
+    "lib": ["ES2022" , "DOM"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "emitDeclarationOnly": true,
+    "moduleResolution": "Node",
+    "baseUrl": ".",
+    "rootDir": "src"
+  },
+  "include": [
+    "src"
+  ]
+}
