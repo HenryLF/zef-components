@@ -1,10 +1,14 @@
 import { StoreApi } from "zustand/vanilla";
 
+export type StateType = {
+  [key: string]: any;
+};
+
 export type GlobalStore = {
   [key: string]: any;
 };
 
-export interface FactoryOption<T extends object> {
+export interface FactoryOption<T extends StateType> {
   observedAttributes?: string[];
   value?: (this: WebComponent<T>) => any;
   state?: T | ((this: WebComponent<T>) => T);
@@ -20,12 +24,12 @@ export interface FactoryOption<T extends object> {
     newValue: string
   ) => void;
 
-  eventListener?: EventListenerRecord<T>;
+  eventListener?: EventListenerRecord;
   storeListener?: Record<Exclude<string, keyof T>, string>;
   noShadowRoot?: boolean;
 }
 
-export interface WebComponent<T extends object> extends HTMLElement {
+export interface WebComponent<T extends StateType> extends HTMLElement {
   name: string;
   root: HTMLElement | ShadowRoot;
   rawHTML: string;
@@ -38,14 +42,14 @@ export interface WebComponent<T extends object> extends HTMLElement {
 
   $store: any;
 
-  $$on: (css: string, ev: EventHandle<T>) => void;
+  $$on: (css: string, ev: EventHandle) => void;
   $$off: (css: string, event: string) => void;
 
   reRenderProperty: (this: WebComponent<T>, pathname: string) => void;
 
   _globalStore: StoreApi<GlobalStore>;
   _dynamicFieldRecord: DynamicFieldsRecord;
-  _eventListenerRecord: EventListenerRecord<T>;
+  _eventListenerRecord: EventListenerRecord;
   _storeListenerRecord: [() => void];
   _valueUpdater: (this: WebComponent<T>) => any;
 }
@@ -58,13 +62,10 @@ export type DynamicField = {
   raw: string;
 };
 
-export type EventListenerRecord<T extends object> = Record<
-  string,
-  EventHandle<T>[]
->;
+export type EventListenerRecord = Record<string, EventHandle[]>;
 
-export type EventHandle<T extends object> = {
+export type EventHandle = {
   event: string;
-  handler: (this: WebComponent<T>, ev: Event) => void;
+  handler: (this: WebComponent<StateType>, ev: Event) => void;
   options?: EventListenerOptions;
 };

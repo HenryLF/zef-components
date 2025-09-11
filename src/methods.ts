@@ -1,6 +1,6 @@
 /* External methods bound to the main Component.*/
 
-import { EventListenerRecord, WebComponent } from "./types";
+import { EventListenerRecord, StateType, WebComponent } from "./types";
 import {
   maybeCall,
   FOR_LOOP_REGEX,
@@ -10,30 +10,30 @@ import {
   TERNARY_REGEX,
 } from "./utils";
 
-export function createReactiveProxy<T extends object>(
-  this: WebComponent<T>,
-  initialState: T,
+export function createReactiveProxy(
+  this: WebComponent<StateType>,
+  initialState: StateType,
   previousPath: string = ""
 ) {
   const handler = {
-    get: (target: T, property: keyof T) => {
+    get: (target: StateType, property: keyof StateType) => {
       const path = previousPath
         ? `${previousPath}.${property as string}`
         : (property as string);
       const value = target[property];
       if (typeof value === "object" && value !== null) {
-        return createReactiveProxy.bind(this)(value, path);
+        return createReactiveProxy.apply(this, [value, path]);
       }
       return value;
     },
-    set: (target: T, property: keyof T, value: any) => {
+    set: (target: StateType, property: keyof StateType, value: any) => {
       if (target[property] === value) return true;
       const path = previousPath
         ? `${previousPath}.${property as string}`
         : (property as string);
       target[property] = value;
       if (typeof value === "object" && value !== null) {
-        target[property] = createReactiveProxy.bind(this)(value, path);
+        target[property] = createReactiveProxy.apply(this, [value, path]);
       }
       const newValue = maybeCall(this._valueUpdater, this);
       if (this.value !== newValue) {
@@ -48,15 +48,17 @@ export function createReactiveProxy<T extends object>(
   return new Proxy(initialState, handler);
 }
 
-export function initializeStoreListeners<T extends object>(
-  this: WebComponent<T>,
-  storeListener: Record<Exclude<string, keyof T>, string> | undefined,
-  initialState: T
+export function initializeStoreListeners(
+  this: WebComponent<StateType>,
+  storeListener: Record<string, string> | undefined,
+  initialState: StateType
 ) {
   if (!storeListener) return;
+
   for (const key in storeListener) {
     const storeKey = storeListener[key];
     initialState[key] = () => this._globalStore.getState()[storeKey];
+
     const unsub = this._globalStore.subscribe(
       (store) => store[storeKey],
       //@ts-expect-error zustand middleware
@@ -71,11 +73,11 @@ export function initializeStoreListeners<T extends object>(
   }
 }
 
-export function clearStoreListeners<T extends object>(this: WebComponent<T>) {
+export function clearStoreListeners(this: WebComponent<StateType>) {
   this._storeListenerRecord.forEach((unsub) => unsub());
 }
 
-export function registerRerenders<T extends object>(this: WebComponent<T>) {
+export function registerRerenders(this: WebComponent<StateType>) {
   this.$$("[re-render]").forEach((element) => {
     const reRenderAttr = element.getAttribute("re-render") ?? "";
 
@@ -96,9 +98,9 @@ export function registerRerenders<T extends object>(this: WebComponent<T>) {
   });
 }
 
-export function initializeEventListener<T extends object>(
-  this: WebComponent<T>,
-  eventListeners: EventListenerRecord<T>
+export function initializeEventListener(
+  this: WebComponent<StateType>,
+  eventListeners: EventListenerRecord
 ) {
   for (let cssSelector in eventListeners) {
     for (let { event, handler, options } of eventListeners[cssSelector]) {
@@ -118,8 +120,8 @@ export function initializeEventListener<T extends object>(
   }
 }
 
-export function reattachEventListeners<T extends object>(
-  this: WebComponent<T>,
+export function reattachEventListeners(
+  this: WebComponent<StateType>,
   id: string
 ) {
   const target = this.root.querySelector(`[internal-id=${id}]`);
@@ -138,7 +140,7 @@ export function reattachEventListeners<T extends object>(
   }
 }
 
-export function registerForLoop<T extends object>(this: WebComponent<T>) {
+export function registerForLoop(this: WebComponent<StateType>) {
   this.$$("[for-loop]").forEach((template) => {
     const forAttr = template.getAttribute("for-loop");
     const match = forAttr?.match(FOR_LOOP_REGEX);
@@ -157,12 +159,12 @@ export function registerForLoop<T extends object>(this: WebComponent<T>) {
       this._dynamicFieldRecord[path].push({ id, type: "loop", raw });
     }
 
-    renderForLoop.bind(this)(raw, template);
+    renderForLoop.apply(this, [raw, template]);
   });
 }
 
-export function renderForLoop<T extends object>(
-  this: WebComponent<T>,
+export function renderForLoop(
+  this: WebComponent<StateType>,
   raw: string,
   container: Element
 ) {
@@ -174,10 +176,8 @@ export function renderForLoop<T extends object>(
   if (!match?.groups || !("path" in match.groups) || !("name" in match.groups))
     return;
   const { path, name } = match.groups;
-
   const target = targetFromPath(this.state, path);
   const value = maybeCall(target);
-  console.log(target, value)
   let compiledHTML: string = "";
   /* case path is a numeric value or correspond to a numeric value */
   if (typeof value == "number" || parseInt(path)) {

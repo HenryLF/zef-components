@@ -1,3 +1,5 @@
+import { StateType } from "./types";
+
 export const TERNARY_REGEX =
   /\{\{(?<path>[a-z0-9\.]*)\s*(?:\?)?\s*(['"`](?<trueVal>[^'"`]*)['"`])?\s*(?::)?\s*(['"`](?<falseVal>[^'"`]*)['"`])?\s*\}\}/gi;
 export const FOR_LOOP_REGEX =
@@ -24,12 +26,12 @@ export function getId() {
     34
   )}${randSeed.toString(34)}`;
 }
-export function targetFromPath<T extends object>(obj: T, path: string) {
+export function targetFromPath(obj: StateType, path: string) {
   const props = path.split(".").map((p) => p.trim());
   let target: any = obj;
   for (let prop of props) {
     if (typeof target === "object" && target[prop] != undefined) {
-      target = target[prop];
+      target = maybeCall(target[prop]);
     } else {
       return null;
     }
@@ -37,9 +39,9 @@ export function targetFromPath<T extends object>(obj: T, path: string) {
   return target;
 }
 
-export function parseHTMLDeclaration<T extends object>(
+export function parseHTMLDeclaration(
   rawHTML: string,
-  object: T
+  object: StateType
 ) {
   return rawHTML.replaceAll(TERNARY_REGEX, (substr: string, ...args) => {
     const groups = args.at(-1);

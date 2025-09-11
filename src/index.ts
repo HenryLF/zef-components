@@ -19,6 +19,7 @@ import {
   DynamicField,
   EventHandle,
   GlobalStore,
+  StateType,
 } from "./types";
 import {
   maybeCall,
@@ -31,7 +32,7 @@ export const globalStore = createStore<GlobalStore>(
   subscribeWithSelector(() => ({}))
 );
 
-export default function Factory<T extends object>(
+export default function Factory<T extends StateType>(
   name: string,
   html: string,
   options?: FactoryOption<T>
@@ -58,8 +59,8 @@ export default function Factory<T extends object>(
     rawHTML: string;
 
     _dynamicFieldRecord: DynamicFieldsRecord = {};
-    _eventListenerRecord: EventListenerRecord<T> = {};
-    _storeListenerRecord = [() => {}];
+    _eventListenerRecord: EventListenerRecord = {};
+    _storeListenerRecord: [() => void] = [() => {}];
     _valueUpdater: any;
 
     constructor() {
@@ -67,9 +68,12 @@ export default function Factory<T extends object>(
 
       const initialState = maybeCall(options?.state, this) ?? {};
 
-      initializeStoreListeners.bind(this)(options?.storeListener, initialState);
+      initializeStoreListeners.apply(this, [
+        options?.storeListener,
+        initialState,
+      ]);
 
-      this.state = createReactiveProxy.bind(this)(initialState);
+      this.state = createReactiveProxy.apply(this, [initialState]) as T;
 
       this._valueUpdater = options?.value ?? null;
       this._value = maybeCall(this._valueUpdater, this);
@@ -87,27 +91,24 @@ export default function Factory<T extends object>(
     }
 
     connectedCallback() {
-      registerForLoop.bind(this)();
-      registerReRenders.bind(this)();
+      registerForLoop.apply(this);
+      registerReRenders.apply(this);
 
       this.root.innerHTML = parseHTMLDeclaration(
         this.root.innerHTML,
         this.state
       );
 
-      initializeEventListener.bind(this)(options?.eventListener ?? {});
+      initializeEventListener.apply(this, [options?.eventListener ?? {}]);
 
-      options?.onMount?.bind(this)();
+      options?.onMount?.apply(this);
     }
 
-    attributeChangedCallback(...args: string[]) {
-      options?.onAttributeChanged?.bind(this)(...args);
+    attributeChangedCallback(name: string, oldValue: string, newValue: string) {
+      options?.onAttributeChanged?.apply(this, [name, oldValue, newValue]);
     }
 
-    reRenderProperty<T extends object>(
-      this: WebComponent<T>,
-      pathname: string
-    ) {
+    reRenderProperty(this: WebComponent<StateType>, pathname: string) {
       /* Called on change of the `pathname` state property*/
       const fieldsToUpdate = Object.entries(this._dynamicFieldRecord).reduce<
         DynamicField[]
@@ -127,7 +128,7 @@ export default function Factory<T extends object>(
             targetElement.outerHTML = parseHTMLDeclaration(raw, this.state);
             break;
           case "loop":
-            renderForLoop.bind(this)(raw, targetElement);
+            renderForLoop.apply(this, [raw, targetElement]);
             targetElement.outerHTML = parseHTMLDeclaration(
               targetElement.outerHTML,
               this.state
@@ -135,14 +136,14 @@ export default function Factory<T extends object>(
             break;
           default:
         }
-        reattachEventListeners.bind(this)(id);
+        reattachEventListeners.apply(this, [id]);
       }
-      options?.onRender?.bind(this)(pathname);
+      options?.onRender?.apply(this, [pathname]);
     }
 
     disconnectedCallback() {
-      clearStoreListeners.bind(this)();
-      options?.onUnmount?.bind(this)();
+      clearStoreListeners.apply(this);
+      options?.onUnmount?.apply(this);
     }
 
     /* magic method */
@@ -160,7 +161,7 @@ export default function Factory<T extends object>(
       return this.root.querySelectorAll(css);
     }
 
-    $$on(css: string, { event, handler, options }: EventHandle<T>) {
+    $$on(css: string, { event, handler, options }: EventHandle) {
       const boundHandler = handler.bind(this);
       if (!this._eventListenerRecord[css]) {
         this._eventListenerRecord[css] = [];
