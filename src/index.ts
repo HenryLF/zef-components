@@ -20,6 +20,7 @@ import {
   EventHandle,
   GlobalStore,
   StateType,
+  BoundStoreType,
 } from "./types";
 import {
   maybeCall,
@@ -32,15 +33,15 @@ export const globalStore = createStore<GlobalStore>(
   subscribeWithSelector(() => ({}))
 );
 
-export default function Factory<T extends StateType>(
+export default function Factory<T extends StateType, K extends BoundStoreType>(
   name: string,
   html: string,
-  options?: FactoryOption<T>
+  options?: FactoryOption<T, K>
 ) {
   class Component extends HTMLElement {
     static observedAttributes = options?.observedAttributes ?? [];
 
-    state: T;
+    state: T & Record<keyof K, () => any>;
     _globalStore = globalStore;
     _value: any;
     get value() {
@@ -73,7 +74,8 @@ export default function Factory<T extends StateType>(
         initialState,
       ]);
 
-      this.state = createReactiveProxy.apply(this, [initialState]) as T;
+      this.state = createReactiveProxy.apply(this, [initialState]) as T &
+        Record<keyof K, any>;
 
       this._valueUpdater = options?.value ?? null;
       this._value = maybeCall(this._valueUpdater, this);
@@ -100,11 +102,12 @@ export default function Factory<T extends StateType>(
       );
 
       initializeEventListener.apply(this, [options?.eventListener ?? {}]);
-
+      //@ts-expect-error user provided method
       options?.onMount?.apply(this);
     }
 
     attributeChangedCallback(name: string, oldValue: string, newValue: string) {
+      //@ts-expect-error user provided method
       options?.onAttributeChanged?.apply(this, [name, oldValue, newValue]);
     }
 
@@ -138,11 +141,13 @@ export default function Factory<T extends StateType>(
         }
         reattachEventListeners.apply(this, [id]);
       }
+      //@ts-expect-error user provided method
       options?.onRender?.apply(this, [pathname]);
     }
 
     disconnectedCallback() {
       clearStoreListeners.apply(this);
+      //@ts-expect-error user provided method
       options?.onUnmount?.apply(this);
     }
 

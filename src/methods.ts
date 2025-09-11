@@ -1,6 +1,11 @@
 /* External methods bound to the main Component.*/
 
-import { EventListenerRecord, StateType, WebComponent } from "./types";
+import {
+  EventListenerRecord,
+  GlobalStore,
+  StateType,
+  WebComponent,
+} from "./types";
 import {
   maybeCall,
   FOR_LOOP_REGEX,
@@ -50,7 +55,7 @@ export function createReactiveProxy(
 
 export function initializeStoreListeners(
   this: WebComponent<StateType>,
-  storeListener: Record<string, string> | undefined,
+  storeListener: GlobalStore | undefined,
   initialState: StateType
 ) {
   if (!storeListener) return;
@@ -64,7 +69,7 @@ export function initializeStoreListeners(
       //@ts-expect-error zustand middleware
       (currentVal: any) => {
         if (currentVal !== this.state[key]) {
-          this.state[key] = currentVal;
+          this.state[key] = () => currentVal;
           this.reRenderProperty(key);
         }
       }
