@@ -176,10 +176,12 @@ export function renderForLoop<T extends object>(
   const { path, name } = match.groups;
 
   const target = targetFromPath(this.state, path);
+  const value = maybeCall(target);
+  console.log(target, value)
   let compiledHTML: string = "";
   /* case path is a numeric value or correspond to a numeric value */
-  if (typeof target == "number" || parseInt(path)) {
-    const upperBound = typeof target == "number" ? target : parseInt(path);
+  if (typeof value == "number" || parseInt(path)) {
+    const upperBound = typeof value == "number" ? value : parseInt(path);
 
     for (let i = 0; i < upperBound; i++) {
       compiledHTML += templateHTML.replaceAll(
@@ -191,10 +193,10 @@ export function renderForLoop<T extends object>(
         }
       );
     }
-  } else if (typeof target == "object" && target !== null) {
+  } else if (typeof value == "object" && target !== null) {
     /* case path correspond to an array */
     const index = match.groups.index;
-    for (let key in target) {
+    for (let key in value) {
       compiledHTML += templateHTML.replaceAll(
         TERNARY_REGEX,
         (substring: string, ...args) => {
