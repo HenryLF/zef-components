@@ -3,6 +3,7 @@ import { StoreApi } from "zustand/vanilla";
 export type StateType = {
   [key: string]: any;
 };
+export type BoundState = Record<string,string>
 
 export type GlobalStore = {
   [key: string]: any;
@@ -10,8 +11,8 @@ export type GlobalStore = {
 
 export interface FactoryOption<
   T extends StateType,
-  K extends StateType,
-  L extends StateType
+  K extends BoundState,
+  L extends BoundState
 > {
   observedAttributes?: string[];
   value?: (this: WebComponent<T, K, L>) => any;
@@ -40,8 +41,8 @@ export type StoreUpdater<R = void> = (
 
 export interface WebComponent<
   T extends StateType = StateType,
-  K extends StateType = StateType,
-  L extends StateType = StateType
+  K extends BoundState = BoundState,
+  L extends BoundState = BoundState
 > extends HTMLElement {
   name: string;
   root: HTMLElement | ShadowRoot;
