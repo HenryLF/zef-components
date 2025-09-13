@@ -1,15 +1,18 @@
 import { createStore } from "zustand/vanilla";
 import { subscribeWithSelector } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
 
 import {
   clearStoreListeners,
   createReactiveProxy,
   initializeEventListener,
+  initializePropsListeners,
   initializeStoreListeners,
   reattachEventListeners,
   registerForLoop,
-  registerRerenders as registerReRenders,
+  registerReRenders,
   renderForLoop,
+  updateProps,
 } from "./methods";
 import {
   FactoryOption,
@@ -20,7 +23,8 @@ import {
   EventHandle,
   GlobalStore,
   StateType,
-  BoundStoreType,
+  StoreUpdater,
+  PropListenerRecord,
 } from "./types";
 import {
   maybeCall,
@@ -30,18 +34,24 @@ import {
 
 export const globalStore = createStore<GlobalStore>(
   //@ts-expect-error zustand middleware
-  subscribeWithSelector(() => ({}))
+  subscribeWithSelector(immer(() => ({})))
 );
 
-export default function Factory<T extends StateType, K extends BoundStoreType>(
-  name: string,
-  html: string,
-  options?: FactoryOption<T, K>
-) {
+export default function Factory<
+  T extends StateType,
+  K extends StateType,
+  L extends StateType
+>(name: string, html: string, options?: FactoryOption<T, K, L>) {
+  const observedAttributes: string[] = [];
+  if (options?.observedAttributes) {
+    observedAttributes.push(...options.observedAttributes);
+  }
+  if (options?.props) {
+    observedAttributes.push(...Object.values(options.props));
+  }
   class Component extends HTMLElement {
-    static observedAttributes = options?.observedAttributes ?? [];
-
-    state: T & Record<keyof K, () => any>;
+    static observedAttributes = observedAttributes;
+    state: T & Record<keyof K, () => any> & Record<keyof L, () => string>;
     _globalStore = globalStore;
     _value: any;
     get value() {
@@ -62,6 +72,7 @@ export default function Factory<T extends StateType, K extends BoundStoreType>(
     _dynamicFieldRecord: DynamicFieldsRecord = {};
     _eventListenerRecord: EventListenerRecord = {};
     _storeListenerRecord: [() => void] = [() => {}];
+    _propsListenerRecord: PropListenerRecord = {};
     _valueUpdater: any;
 
     constructor() {
@@ -69,13 +80,16 @@ export default function Factory<T extends StateType, K extends BoundStoreType>(
 
       const initialState = maybeCall(options?.state, this) ?? {};
 
+      initializePropsListeners.apply(this, [options?.props, initialState]);
+
       initializeStoreListeners.apply(this, [
         options?.storeListener,
         initialState,
       ]);
 
       this.state = createReactiveProxy.apply(this, [initialState]) as T &
-        Record<keyof K, any>;
+        Record<keyof K, any> &
+        Record<keyof L, any>;
 
       this._valueUpdater = options?.value ?? null;
       this._value = maybeCall(this._valueUpdater, this);
@@ -107,6 +121,7 @@ export default function Factory<T extends StateType, K extends BoundStoreType>(
     }
 
     attributeChangedCallback(name: string, oldValue: string, newValue: string) {
+      updateProps.apply(this, [name, oldValue, newValue]);
       //@ts-expect-error user provided method
       options?.onAttributeChanged?.apply(this, [name, oldValue, newValue]);
     }
@@ -152,11 +167,11 @@ export default function Factory<T extends StateType, K extends BoundStoreType>(
     }
 
     /* magic method */
-    get $store() {
+    $getStore() {
       return this._globalStore.getState();
     }
-    set $store(val: any) {
-      this._globalStore.setState(val);
+    $setStore(updater: StoreUpdater) {
+      this._globalStore.setState(updater);
     }
 
     $(css: string) {
@@ -183,9 +198,10 @@ export default function Factory<T extends StateType, K extends BoundStoreType>(
 
     $$off(css: string, event: string) {
       if (!this._eventListenerRecord[css]) return;
+
       const toRemove = this._eventListenerRecord[css].filter(
-        ({ event: eventName }) => {
-          return eventName === event;
+        ({ event: recordedEvent }) => {
+          return recordedEvent === event;
         }
       );
       for (const { event, handler, options } of toRemove) {
@@ -193,9 +209,10 @@ export default function Factory<T extends StateType, K extends BoundStoreType>(
           target.removeEventListener(event, handler, options);
         });
       }
+
       this._eventListenerRecord[css] = this._eventListenerRecord[css].filter(
-        (handle) => {
-          return !toRemove.includes(handle);
+        ({ event: recordedEvent }) => {
+          return recordedEvent != event;
         }
       );
     }

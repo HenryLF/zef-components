@@ -1,11 +1,17 @@
 const { build } = require("esbuild");
+const { immer } = require("zustand/middleware/immer");
 
 // Common build configuration
 const commonConfig = {
   bundle: true,
   minify: true,
   entryPoints: ["src/index.ts"],
-  external: ["zustand/vanilla", "zustand/middleware"],
+  external: [
+    "zustand/vanilla",
+    "zustand/middleware",
+    "zustand/middleware/immer",
+    "immer",
+  ],
 };
 
 // CJS build
@@ -21,5 +27,3 @@ build({
   format: "esm",
   outdir: "dist/esm",
 }).catch(() => process.exit(1));
-
-

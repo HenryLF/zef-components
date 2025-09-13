@@ -13,10 +13,11 @@ import {
   parseDocumentFragment,
   targetFromPath,
   TERNARY_REGEX,
+  parseJSON,
 } from "./utils";
 
 export function createReactiveProxy(
-  this: WebComponent<StateType>,
+  this: WebComponent,
   initialState: StateType,
   previousPath: string = ""
 ) {
@@ -52,10 +53,49 @@ export function createReactiveProxy(
   //@ts-expect-error yeah yeah yeah proxy magic
   return new Proxy(initialState, handler);
 }
+export function initializePropsListeners(
+  this: WebComponent,
+  propsListener: GlobalStore | undefined,
+  initialState: StateType
+) {
+  if (!propsListener) return;
+
+  for (const key in propsListener) {
+    const propName = propsListener[key];
+
+    const attrValue = this.getAttribute(propName);
+    if (propName.startsWith("json::")) {
+      initialState[key] = () => parseJSON(attrValue);
+
+      const realPropName = propName.replace("json::", "");
+      this._propsListenerRecord[realPropName] = { type: "json", key };
+      continue;
+    }
+
+    initialState[key] = () => attrValue;
+    this._propsListenerRecord[propName] = { type: "string", key };
+  }
+}
+
+export function updateProps(
+  this: WebComponent,
+  name: string,
+  _: string,
+  newValue: string
+) {
+  if (!(name in this._propsListenerRecord)) return;
+  const { type, key } = this._propsListenerRecord[name];
+  if (type == "json") {
+    const parsed = parseJSON(newValue);
+    this.state[key] = () => parsed;
+  } else {
+    this.state[key] = () => newValue;
+  }
+}
 
 export function initializeStoreListeners(
-  this: WebComponent<StateType>,
-  storeListener: GlobalStore | undefined,
+  this: WebComponent,
+  storeListener: StateType | undefined,
   initialState: StateType
 ) {
   if (!storeListener) return;
@@ -78,11 +118,11 @@ export function initializeStoreListeners(
   }
 }
 
-export function clearStoreListeners(this: WebComponent<StateType>) {
+export function clearStoreListeners(this: WebComponent) {
   this._storeListenerRecord.forEach((unsub) => unsub());
 }
 
-export function registerRerenders(this: WebComponent<StateType>) {
+export function registerReRenders(this: WebComponent) {
   this.$$("[re-render]").forEach((element) => {
     const reRenderAttr = element.getAttribute("re-render") ?? "";
 
@@ -104,32 +144,18 @@ export function registerRerenders(this: WebComponent<StateType>) {
 }
 
 export function initializeEventListener(
-  this: WebComponent<StateType>,
+  this: WebComponent,
   eventListeners: EventListenerRecord
 ) {
   for (let cssSelector in eventListeners) {
-    for (let { event, handler, options } of eventListeners[cssSelector]) {
-      const boundHandler = handler.bind(this);
-      this.root.querySelectorAll(cssSelector).forEach((element) => {
-        element.addEventListener(event, boundHandler, options);
-      });
-      if (!this._eventListenerRecord[cssSelector]) {
-        this._eventListenerRecord[cssSelector] = [];
-      }
-      this._eventListenerRecord[cssSelector].push({
-        event,
-        handler: boundHandler,
-        options,
-      });
+    for (let eventHandle of eventListeners[cssSelector]) {
+      this.$$on(cssSelector, eventHandle);
     }
   }
 }
 
-export function reattachEventListeners(
-  this: WebComponent<StateType>,
-  id: string
-) {
-  const target = this.root.querySelector(`[internal-id=${id}]`);
+export function reattachEventListeners(this: WebComponent, id: string) {
+  const target = this.$(`[internal-id=${id}]`);
   if (!target) return;
   for (let cssSelector in this._eventListenerRecord) {
     for (let { event, handler, options } of this._eventListenerRecord[
@@ -145,7 +171,7 @@ export function reattachEventListeners(
   }
 }
 
-export function registerForLoop(this: WebComponent<StateType>) {
+export function registerForLoop(this: WebComponent) {
   this.$$("[for-loop]").forEach((template) => {
     const forAttr = template.getAttribute("for-loop");
     const match = forAttr?.match(FOR_LOOP_REGEX);
@@ -169,7 +195,7 @@ export function registerForLoop(this: WebComponent<StateType>) {
 }
 
 export function renderForLoop(
-  this: WebComponent<StateType>,
+  this: WebComponent,
   raw: string,
   container: Element
 ) {

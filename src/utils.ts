@@ -1,9 +1,27 @@
 import { StateType } from "./types";
 
 export const TERNARY_REGEX =
-  /\{\{(?<path>[a-z0-9\.]*)\s*(?:\?)?\s*(['"`](?<trueVal>[^'"`]*)['"`])?\s*(?::)?\s*(['"`](?<falseVal>[^'"`]*)['"`])?\s*\}\}/gi;
+  /\{\{(?<json>json::)?(?<path>[a-z0-9\.]*)\s*(?:\?)?\s*(['"`](?<trueVal>[^'"`]*)['"`])?\s*(?::)?\s*(['"`](?<falseVal>[^'"`]*)['"`])?\s*\}\}/gi;
 export const FOR_LOOP_REGEX =
   /((?<index>\w+)\s*,\s*)?(?<name>\w+)\s+((in)|(of))\s+(?<path>[a-z0-9\.]+)/i;
+
+export function parseJSON(json: string | null) {
+  if (!json) return null;
+  try {
+    return JSON.parse(json.replaceAll("'", '"'));
+  } catch (e) {
+    // console.error(e);
+    return null;
+  }
+}
+
+function mashallJSON(obj: any) {
+  return JSON.stringify(obj).replaceAll('"', "'");
+}
+
+function unProxyfy(obj: object) {
+  return JSON.parse(JSON.stringify(obj));
+}
 
 export function parseDocumentFragment(rawHTML: string) {
   const template = document.createElement("template");
@@ -30,7 +48,7 @@ export function targetFromPath(obj: StateType, path: string) {
   const props = path.split(".").map((p) => p.trim());
   let target: any = obj;
   for (let prop of props) {
-    if (typeof target === "object" && target[prop] != undefined) {
+    if (typeof target === "object" && target != undefined && target[prop] != undefined) {
       target = maybeCall(target[prop]);
     } else {
       return null;
@@ -39,10 +57,7 @@ export function targetFromPath(obj: StateType, path: string) {
   return target;
 }
 
-export function parseHTMLDeclaration(
-  rawHTML: string,
-  object: StateType
-) {
+export function parseHTMLDeclaration(rawHTML: string, object: StateType) {
   return rawHTML.replaceAll(TERNARY_REGEX, (substr: string, ...args) => {
     const groups = args.at(-1);
     if (!groups || !("path" in groups)) return substr;
@@ -57,6 +72,10 @@ export function parseHTMLDeclaration(
     if (trueVal || falseVal) {
       return value ? trueVal : falseVal;
     }
-    return value?.toString();
+    if ("json" in groups && groups["json"]) {
+      return mashallJSON(value);
+    }
+    const rawValue = typeof value === "object" ? unProxyfy(value) : value;
+    return rawValue?.toString();
   });
 }
