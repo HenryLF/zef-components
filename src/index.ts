@@ -48,7 +48,7 @@ export default function Factory<
     observedAttributes.push(...options.observedAttributes);
   }
   if (options?.props) {
-    observedAttributes.push(...Object.values(options.props));
+    observedAttributes.push(...Object.values(options.props).map(prop => prop.replace("json::", "")));
   }
   class Component extends HTMLElement {
     static observedAttributes = observedAttributes;
