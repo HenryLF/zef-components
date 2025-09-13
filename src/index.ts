@@ -25,6 +25,7 @@ import {
   StateType,
   StoreUpdater,
   PropListenerRecord,
+  BoundState,
 } from "./types";
 import {
   maybeCall,
@@ -39,8 +40,8 @@ export const globalStore = createStore<GlobalStore>(
 
 export default function Factory<
   T extends StateType,
-  K extends StateType,
-  L extends StateType
+  K extends BoundState,
+  L extends BoundState
 >(name: string, html: string, options?: FactoryOption<T, K, L>) {
   const observedAttributes: string[] = [];
   if (options?.observedAttributes) {
