@@ -29,9 +29,12 @@ export function parseDocumentFragment(rawHTML: string) {
   return template.content.cloneNode(true) as DocumentFragment;
 }
 
-export function maybeCall<T>(k: T | ((this: any) => T), thisObj: any = {}) {
-  if (typeof k == "function") {
-    return k.bind(thisObj)();
+export function maybeCall(
+  k: unknown | ((this: unknown) => unknown),
+  thisObj: any = {}
+) {
+  if (typeof k === "function") {
+    return k.apply(thisObj);
   }
   return k;
 }
@@ -47,9 +50,14 @@ export function getId() {
 export function targetFromPath(obj: StateType, path: string) {
   const props = path.split(".").map((p) => p.trim());
   let target: any = obj;
+
   for (let prop of props) {
-    if (typeof target === "object" && target != undefined && target[prop] != undefined) {
-      target = maybeCall(target[prop]);
+    if (
+      typeof target === "object" &&
+      target != undefined &&
+      target[prop] != undefined
+    ) {
+      target = maybeCall(target[prop] , obj);
     } else {
       return null;
     }

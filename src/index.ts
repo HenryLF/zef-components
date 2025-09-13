@@ -153,17 +153,19 @@ export default function Factory<
         if (!targetElement) continue;
 
         switch (type) {
+          case "declaration":
+            targetElement.outerHTML = parseHTMLDeclaration(raw, this.state);
+            break;
           case "loop":
             renderForLoop.apply(this, [raw, targetElement]);
-            break;
           case "ifblock":
             renderIfBlock.apply(this, [pathname, raw, targetElement]);
           default:
+            targetElement.outerHTML = parseHTMLDeclaration(
+              targetElement.outerHTML,
+              this.state
+            );
         }
-        targetElement.outerHTML = parseHTMLDeclaration(
-          targetElement.outerHTML,
-          this.state
-        );
         reattachEventListeners.apply(this, [id]);
       }
       //@ts-expect-error user provided method
