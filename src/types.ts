@@ -74,7 +74,7 @@ export type DynamicFieldsRecord = Record<string, DynamicField[]>;
 
 export type DynamicField = {
   id: string;
-  type: "loop" | "declaration";
+  type: "loop" | "declaration" | "ifblock";
   raw: string;
 };
 

@@ -1,0 +1,597 @@
+diff --git a/esbuild.config.cjs b/esbuild.config.cjs
+index 6ae1116..e77748b 100644
+--- a/esbuild.config.cjs
++++ b/esbuild.config.cjs
+@@ -1,17 +1,11 @@
+ const { build } = require("esbuild");
+-const { immer } = require("zustand/middleware/immer");
+ 
+ // Common build configuration
+ const commonConfig = {
+   bundle: true,
+   minify: true,
+   entryPoints: ["src/index.ts"],
+-  external: [
+-    "zustand/vanilla",
+-    "zustand/middleware",
+-    "zustand/middleware/immer",
+-    "immer",
+-  ],
++  external: ["zustand/vanilla", "zustand/middleware"],
+ };
+ 
+ // CJS build
+@@ -27,3 +21,5 @@ build({
+   format: "esm",
+   outdir: "dist/esm",
+ }).catch(() => process.exit(1));
++
++
+diff --git a/package-lock.json b/package-lock.json
+index cbca93a..e4b4277 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,15 +1,14 @@
+ {
+   "name": "zef-components",
+-  "version": "2.0.5",
++  "version": "1.0.1",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "zef-components",
+-      "version": "2.0.5",
++      "version": "1.0.1",
+       "license": "ISC",
+       "dependencies": {
+-        "immer": "^10.1.3",
+         "zustand": "^5.0.8"
+       },
+       "devDependencies": {
+@@ -500,16 +499,6 @@
+         "@esbuild/win32-x64": "0.25.9"
+       }
+     },
+-    "node_modules/immer": {
+-      "version": "10.1.3",
+-      "resolved": "https://registry.npmjs.org/immer/-/immer-10.1.3.tgz",
+-      "integrity": "sha512-tmjF/k8QDKydUlm3mZU+tjM6zeq9/fFpPqH9SzWmBnVVKsPBg/V66qsMwb3/Bo90cgUN+ghdVBess+hPsxUyRw==",
+-      "license": "MIT",
+-      "funding": {
+-        "type": "opencollective",
+-        "url": "https://opencollective.com/immer"
+-      }
+-    },
+     "node_modules/zustand": {
+       "version": "5.0.8",
+       "resolved": "https://registry.npmjs.org/zustand/-/zustand-5.0.8.tgz",
+diff --git a/package.json b/package.json
+index 064e62a..bc6729b 100644
+--- a/package.json
++++ b/package.json
+@@ -1,10 +1,10 @@
+ {
+   "name": "zef-components",
+-  "version": "2.0.6",
++  "version": "2.0.5",
+   "description": "A lightweight library for creating reactive web components with state management, declarative templates, and seamless store integration.",
+   "module": "dist/esm/index.js",
+   "main": "dist/cjs/index.js",
+-  "source": "src/index.ts",
++  "source" : "src/index.ts",
+   "types": "dist/types/index.d.ts",
+   "scripts": {
+     "build": "node esbuild.config.cjs && tsc"
+@@ -31,11 +31,7 @@
+     "esbuild": "^0.25.9"
+   },
+   "dependencies": {
+-    "immer": "^10.1.3",
+     "zustand": "^5.0.8"
+   },
+-  "files": [
+-    "dist",
+-    "src"
+-  ]
++  "files": ["dist" , "src"]
+ }
+diff --git a/releases/zef-components-2.0.6.tgz b/releases/zef-components-2.0.6.tgz
+deleted file mode 100644
+index 2ab9d54..0000000
+Binary files a/releases/zef-components-2.0.6.tgz and /dev/null differ
+diff --git a/src/index.ts b/src/index.ts
+index 3e5a417..c599499 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1,18 +1,15 @@
+ import { createStore } from "zustand/vanilla";
+ import { subscribeWithSelector } from "zustand/middleware";
+-import { immer } from "zustand/middleware/immer";
+ 
+ import {
+   clearStoreListeners,
+   createReactiveProxy,
+   initializeEventListener,
+-  initializePropsListeners,
+   initializeStoreListeners,
+   reattachEventListeners,
+   registerForLoop,
+-  registerReRenders,
++  registerRerenders as registerReRenders,
+   renderForLoop,
+-  updateProps,
+ } from "./methods";
+ import {
+   FactoryOption,
+@@ -23,8 +20,6 @@ import {
+   EventHandle,
+   GlobalStore,
+   StateType,
+-  StoreUpdater,
+-  PropListenerRecord,
+ } from "./types";
+ import {
+   maybeCall,
+@@ -34,24 +29,18 @@ import {
+ 
+ export const globalStore = createStore<GlobalStore>(
+   //@ts-expect-error zustand middleware
+-  subscribeWithSelector(immer(() => ({})))
++  subscribeWithSelector(() => ({}))
+ );
+ 
+-export default function Factory<
+-  T extends StateType,
+-  K extends StateType,
+-  L extends StateType
+->(name: string, html: string, options?: FactoryOption<T, K, L>) {
+-  const observedAttributes: string[] = [];
+-  if (options?.observedAttributes) {
+-    observedAttributes.push(...options.observedAttributes);
+-  }
+-  if (options?.props) {
+-    observedAttributes.push(...Object.values(options.props));
+-  }
++export default function Factory<T extends StateType>(
++  name: string,
++  html: string,
++  options?: FactoryOption<T>
++) {
+   class Component extends HTMLElement {
+-    static observedAttributes = observedAttributes;
+-    state: T & Record<keyof K, () => any> & Record<keyof L, () => string>;
++    static observedAttributes = options?.observedAttributes ?? [];
++
++    state: T;
+     _globalStore = globalStore;
+     _value: any;
+     get value() {
+@@ -72,7 +61,6 @@ export default function Factory<
+     _dynamicFieldRecord: DynamicFieldsRecord = {};
+     _eventListenerRecord: EventListenerRecord = {};
+     _storeListenerRecord: [() => void] = [() => {}];
+-    _propsListenerRecord: PropListenerRecord = {};
+     _valueUpdater: any;
+ 
+     constructor() {
+@@ -80,16 +68,12 @@ export default function Factory<
+ 
+       const initialState = maybeCall(options?.state, this) ?? {};
+ 
+-      initializePropsListeners.apply(this, [options?.props, initialState]);
+-
+       initializeStoreListeners.apply(this, [
+         options?.storeListener,
+         initialState,
+       ]);
+ 
+-      this.state = createReactiveProxy.apply(this, [initialState]) as T &
+-        Record<keyof K, any> &
+-        Record<keyof L, any>;
++      this.state = createReactiveProxy.apply(this, [initialState]) as T;
+ 
+       this._valueUpdater = options?.value ?? null;
+       this._value = maybeCall(this._valueUpdater, this);
+@@ -116,13 +100,11 @@ export default function Factory<
+       );
+ 
+       initializeEventListener.apply(this, [options?.eventListener ?? {}]);
+-      //@ts-expect-error user provided method
++
+       options?.onMount?.apply(this);
+     }
+ 
+     attributeChangedCallback(name: string, oldValue: string, newValue: string) {
+-      updateProps.apply(this, [name, oldValue, newValue]);
+-      //@ts-expect-error user provided method
+       options?.onAttributeChanged?.apply(this, [name, oldValue, newValue]);
+     }
+ 
+@@ -156,22 +138,20 @@ export default function Factory<
+         }
+         reattachEventListeners.apply(this, [id]);
+       }
+-      //@ts-expect-error user provided method
+       options?.onRender?.apply(this, [pathname]);
+     }
+ 
+     disconnectedCallback() {
+       clearStoreListeners.apply(this);
+-      //@ts-expect-error user provided method
+       options?.onUnmount?.apply(this);
+     }
+ 
+     /* magic method */
+-    $getStore() {
++    get $store() {
+       return this._globalStore.getState();
+     }
+-    $setStore(updater: StoreUpdater) {
+-      this._globalStore.setState(updater);
++    set $store(val: any) {
++      this._globalStore.setState(val);
+     }
+ 
+     $(css: string) {
+@@ -198,10 +178,9 @@ export default function Factory<
+ 
+     $$off(css: string, event: string) {
+       if (!this._eventListenerRecord[css]) return;
+-
+       const toRemove = this._eventListenerRecord[css].filter(
+-        ({ event: recordedEvent }) => {
+-          return recordedEvent === event;
++        ({ event: eventName }) => {
++          return eventName === event;
+         }
+       );
+       for (const { event, handler, options } of toRemove) {
+@@ -209,10 +188,9 @@ export default function Factory<
+           target.removeEventListener(event, handler, options);
+         });
+       }
+-
+       this._eventListenerRecord[css] = this._eventListenerRecord[css].filter(
+-        ({ event: recordedEvent }) => {
+-          return recordedEvent != event;
++        (handle) => {
++          return !toRemove.includes(handle);
+         }
+       );
+     }
+diff --git a/src/methods.ts b/src/methods.ts
+index 1299c58..3379e56 100644
+--- a/src/methods.ts
++++ b/src/methods.ts
+@@ -1,11 +1,6 @@
+ /* External methods bound to the main Component.*/
+ 
+-import {
+-  EventListenerRecord,
+-  GlobalStore,
+-  StateType,
+-  WebComponent,
+-} from "./types";
++import { EventListenerRecord, StateType, WebComponent } from "./types";
+ import {
+   maybeCall,
+   FOR_LOOP_REGEX,
+@@ -13,11 +8,10 @@ import {
+   parseDocumentFragment,
+   targetFromPath,
+   TERNARY_REGEX,
+-  parseJSON,
+ } from "./utils";
+ 
+ export function createReactiveProxy(
+-  this: WebComponent,
++  this: WebComponent<StateType>,
+   initialState: StateType,
+   previousPath: string = ""
+ ) {
+@@ -53,49 +47,10 @@ export function createReactiveProxy(
+   //@ts-expect-error yeah yeah yeah proxy magic
+   return new Proxy(initialState, handler);
+ }
+-export function initializePropsListeners(
+-  this: WebComponent,
+-  propsListener: GlobalStore | undefined,
+-  initialState: StateType
+-) {
+-  if (!propsListener) return;
+-
+-  for (const key in propsListener) {
+-    const propName = propsListener[key];
+-
+-    const attrValue = this.getAttribute(propName);
+-    if (propName.startsWith("json::")) {
+-      initialState[key] = () => parseJSON(attrValue);
+-
+-      const realPropName = propName.replace("json::", "");
+-      this._propsListenerRecord[realPropName] = { type: "json", key };
+-      continue;
+-    }
+-
+-    initialState[key] = () => attrValue;
+-    this._propsListenerRecord[propName] = { type: "string", key };
+-  }
+-}
+-
+-export function updateProps(
+-  this: WebComponent,
+-  name: string,
+-  _: string,
+-  newValue: string
+-) {
+-  if (!(name in this._propsListenerRecord)) return;
+-  const { type, key } = this._propsListenerRecord[name];
+-  if (type == "json") {
+-    const parsed = parseJSON(newValue);
+-    this.state[key] = () => parsed;
+-  } else {
+-    this.state[key] = () => newValue;
+-  }
+-}
+ 
+ export function initializeStoreListeners(
+-  this: WebComponent,
+-  storeListener: StateType | undefined,
++  this: WebComponent<StateType>,
++  storeListener: Record<string, string> | undefined,
+   initialState: StateType
+ ) {
+   if (!storeListener) return;
+@@ -109,7 +64,7 @@ export function initializeStoreListeners(
+       //@ts-expect-error zustand middleware
+       (currentVal: any) => {
+         if (currentVal !== this.state[key]) {
+-          this.state[key] = () => currentVal;
++          this.state[key] = currentVal;
+           this.reRenderProperty(key);
+         }
+       }
+@@ -118,11 +73,11 @@ export function initializeStoreListeners(
+   }
+ }
+ 
+-export function clearStoreListeners(this: WebComponent) {
++export function clearStoreListeners(this: WebComponent<StateType>) {
+   this._storeListenerRecord.forEach((unsub) => unsub());
+ }
+ 
+-export function registerReRenders(this: WebComponent) {
++export function registerRerenders(this: WebComponent<StateType>) {
+   this.$$("[re-render]").forEach((element) => {
+     const reRenderAttr = element.getAttribute("re-render") ?? "";
+ 
+@@ -144,18 +99,32 @@ export function registerReRenders(this: WebComponent) {
+ }
+ 
+ export function initializeEventListener(
+-  this: WebComponent,
++  this: WebComponent<StateType>,
+   eventListeners: EventListenerRecord
+ ) {
+   for (let cssSelector in eventListeners) {
+-    for (let eventHandle of eventListeners[cssSelector]) {
+-      this.$$on(cssSelector, eventHandle);
++    for (let { event, handler, options } of eventListeners[cssSelector]) {
++      const boundHandler = handler.bind(this);
++      this.root.querySelectorAll(cssSelector).forEach((element) => {
++        element.addEventListener(event, boundHandler, options);
++      });
++      if (!this._eventListenerRecord[cssSelector]) {
++        this._eventListenerRecord[cssSelector] = [];
++      }
++      this._eventListenerRecord[cssSelector].push({
++        event,
++        handler: boundHandler,
++        options,
++      });
+     }
+   }
+ }
+ 
+-export function reattachEventListeners(this: WebComponent, id: string) {
+-  const target = this.$(`[internal-id=${id}]`);
++export function reattachEventListeners(
++  this: WebComponent<StateType>,
++  id: string
++) {
++  const target = this.root.querySelector(`[internal-id=${id}]`);
+   if (!target) return;
+   for (let cssSelector in this._eventListenerRecord) {
+     for (let { event, handler, options } of this._eventListenerRecord[
+@@ -171,7 +140,7 @@ export function reattachEventListeners(this: WebComponent, id: string) {
+   }
+ }
+ 
+-export function registerForLoop(this: WebComponent) {
++export function registerForLoop(this: WebComponent<StateType>) {
+   this.$$("[for-loop]").forEach((template) => {
+     const forAttr = template.getAttribute("for-loop");
+     const match = forAttr?.match(FOR_LOOP_REGEX);
+@@ -195,7 +164,7 @@ export function registerForLoop(this: WebComponent) {
+ }
+ 
+ export function renderForLoop(
+-  this: WebComponent,
++  this: WebComponent<StateType>,
+   raw: string,
+   container: Element
+ ) {
+diff --git a/src/types.ts b/src/types.ts
+index 829a79f..271724b 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -3,71 +3,55 @@ import { StoreApi } from "zustand/vanilla";
+ export type StateType = {
+   [key: string]: any;
+ };
+-export type BoundState = Record<string,string>
+ 
+ export type GlobalStore = {
+   [key: string]: any;
+ };
+ 
+-export interface FactoryOption<
+-  T extends StateType,
+-  K extends BoundState,
+-  L extends BoundState
+-> {
++export interface FactoryOption<T extends StateType> {
+   observedAttributes?: string[];
+-  value?: (this: WebComponent<T, K, L>) => any;
+-  state?: T | ((this: WebComponent<T, K, L>) => T);
+-  props?: L;
++  value?: (this: WebComponent<T>) => any;
++  state?: T | ((this: WebComponent<T>) => T);
+ 
+-  onMount?: (this: WebComponent<T, K>) => void;
+-  onUnmount?: (this: WebComponent<T, K, L>) => void;
+-  onRender?: (this: WebComponent<T, K, L>, path: string) => void;
++  onMount?: (this: WebComponent<T>) => void;
++  onUnmount?: (this: WebComponent<T>) => void;
++  onRender?: (this: WebComponent<T>, path: string) => void;
+ 
+   onAttributeChanged?: (
+-    this: WebComponent<T, K, L>,
++    this: WebComponent<T>,
+     name: string,
+     oldValue: string,
+     newValue: string
+   ) => void;
+ 
+   eventListener?: EventListenerRecord;
+-  storeListener?: K;
++  storeListener?: Record<Exclude<string, keyof T>, string>;
+   noShadowRoot?: boolean;
+ }
+ 
+-export type StoreUpdater<R = void> = (
+-  arg: GlobalStore
+-) => R extends void ? void : never;
+-
+-export interface WebComponent<
+-  T extends StateType = StateType,
+-  K extends BoundState = BoundState,
+-  L extends BoundState = BoundState
+-> extends HTMLElement {
++export interface WebComponent<T extends StateType> extends HTMLElement {
+   name: string;
+   root: HTMLElement | ShadowRoot;
+   rawHTML: string;
+ 
+-  state: T & Record<keyof K, () => any> & Record<keyof L, () => string | any>;
++  state: T;
+   value: any;
+ 
+   $: (css: string) => Element | null;
+   $$: (css: string) => NodeListOf<Element>;
+ 
+-  $getStore: () => GlobalStore;
+-  $setStore: (updater: StoreUpdater) => void;
++  $store: any;
+ 
+   $$on: (css: string, ev: EventHandle) => void;
+   $$off: (css: string, event: string) => void;
+ 
+-  reRenderProperty: (this: WebComponent<T, K, L>, pathname: string) => void;
++  reRenderProperty: (this: WebComponent<T>, pathname: string) => void;
+ 
+   _globalStore: StoreApi<GlobalStore>;
+   _dynamicFieldRecord: DynamicFieldsRecord;
+   _eventListenerRecord: EventListenerRecord;
+   _storeListenerRecord: [() => void];
+-  _propsListenerRecord: PropListenerRecord;
+-  _valueUpdater: (this: WebComponent<T, K, L>) => any;
++  _valueUpdater: (this: WebComponent<T>) => any;
+ }
+ 
+ export type DynamicFieldsRecord = Record<string, DynamicField[]>;
+@@ -79,16 +63,9 @@ export type DynamicField = {
+ };
+ 
+ export type EventListenerRecord = Record<string, EventHandle[]>;
+-export type PropListenerRecord = Record<
+-  string,
+-  {
+-    type: "string" | "json";
+-    key: string;
+-  }
+->;
+ 
+ export type EventHandle = {
+   event: string;
+-  handler: (this: WebComponent, ev: Event) => void;
++  handler: (this: WebComponent<StateType>, ev: Event) => void;
+   options?: EventListenerOptions;
+ };
+diff --git a/src/utils.ts b/src/utils.ts
+index 520adc1..a1bf2ed 100644
+--- a/src/utils.ts
++++ b/src/utils.ts
+@@ -1,28 +1,10 @@
+ import { StateType } from "./types";
+ 
+ export const TERNARY_REGEX =
+-  /\{\{(?<json>json::)?(?<path>[a-z0-9\.]*)\s*(?:\?)?\s*(['"`](?<trueVal>[^'"`]*)['"`])?\s*(?::)?\s*(['"`](?<falseVal>[^'"`]*)['"`])?\s*\}\}/gi;
++  /\{\{(?<path>[a-z0-9\.]*)\s*(?:\?)?\s*(['"`](?<trueVal>[^'"`]*)['"`])?\s*(?::)?\s*(['"`](?<falseVal>[^'"`]*)['"`])?\s*\}\}/gi;
+ export const FOR_LOOP_REGEX =
+   /((?<index>\w+)\s*,\s*)?(?<name>\w+)\s+((in)|(of))\s+(?<path>[a-z0-9\.]+)/i;
+ 
+-export function parseJSON(json: string | null) {
+-  if (!json) return null;
+-  try {
+-    return JSON.parse(json.replaceAll("'", '"'));
+-  } catch (e) {
+-    // console.error(e);
+-    return null;
+-  }
+-}
+-
+-function mashallJSON(obj: any) {
+-  return JSON.stringify(obj).replaceAll('"', "'");
+-}
+-
+-function unProxyfy(obj: object) {
+-  return JSON.parse(JSON.stringify(obj));
+-}
+-
+ export function parseDocumentFragment(rawHTML: string) {
+   const template = document.createElement("template");
+   template.innerHTML = rawHTML;
+@@ -48,7 +30,7 @@ export function targetFromPath(obj: StateType, path: string) {
+   const props = path.split(".").map((p) => p.trim());
+   let target: any = obj;
+   for (let prop of props) {
+-    if (typeof target === "object" && target != undefined && target[prop] != undefined) {
++    if (typeof target === "object" && target[prop] != undefined) {
+       target = maybeCall(target[prop]);
+     } else {
+       return null;
+@@ -57,7 +39,10 @@ export function targetFromPath(obj: StateType, path: string) {
+   return target;
+ }
+ 
+-export function parseHTMLDeclaration(rawHTML: string, object: StateType) {
++export function parseHTMLDeclaration(
++  rawHTML: string,
++  object: StateType
++) {
+   return rawHTML.replaceAll(TERNARY_REGEX, (substr: string, ...args) => {
+     const groups = args.at(-1);
+     if (!groups || !("path" in groups)) return substr;
+@@ -72,10 +57,6 @@ export function parseHTMLDeclaration(rawHTML: string, object: StateType) {
+     if (trueVal || falseVal) {
+       return value ? trueVal : falseVal;
+     }
+-    if ("json" in groups && groups["json"]) {
+-      return mashallJSON(value);
+-    }
+-    const rawValue = typeof value === "object" ? unProxyfy(value) : value;
+-    return rawValue?.toString();
++    return value?.toString();
+   });
+ }

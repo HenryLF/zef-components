@@ -101,11 +101,19 @@ export function initializeStoreListeners(
   if (!storeListener) return;
 
   for (const key in storeListener) {
-    const storeKey = storeListener[key];
-    initialState[key] = () => this._globalStore.getState()[storeKey];
+    const storePath = storeListener[key];
+    const storeKeys = storePath.split(".");
+    const getStorePath = (store: GlobalStore) =>
+      storeKeys.reduce((acc: any, prop: string) => {
+        if (acc && prop in acc) {
+          return acc[prop];
+        }
+        return null;
+      }, store);
+    initialState[key] = () => getStorePath(this.$getStore());
 
     const unsub = this._globalStore.subscribe(
-      (store) => store[storeKey],
+      (store) => getStorePath(store),
       //@ts-expect-error zustand middleware
       (currentVal: any) => {
         if (currentVal !== this.state[key]) {
@@ -168,6 +176,39 @@ export function reattachEventListeners(this: WebComponent, id: string) {
         elements.addEventListener(event, handler, options);
       });
     }
+  }
+}
+
+export function registerIfBlock(this: WebComponent) {
+  this.$$("[if]").forEach((template) => {
+    const ifAttr = template.getAttribute("if");
+    if (!ifAttr) return;
+    const raw = template.innerHTML;
+    const id = getId();
+    template.setAttribute("internal-id", id);
+
+    if (!this._dynamicFieldRecord[ifAttr]) {
+      this._dynamicFieldRecord[ifAttr] = [];
+    }
+    this._dynamicFieldRecord[ifAttr].push({
+      type: "ifblock",
+      raw,
+      id,
+    });
+    renderIfBlock.apply(this, [ifAttr, raw, template]);
+  });
+}
+
+export function renderIfBlock(
+  this: WebComponent,
+  key: string,
+  raw: string,
+  container: Element
+) {
+  if (targetFromPath(this.state, key)) {
+    container.innerHTML = raw;
+  } else {
+    container.innerHTML = "";
   }
 }
 

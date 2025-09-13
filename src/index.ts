@@ -10,8 +10,10 @@ import {
   initializeStoreListeners,
   reattachEventListeners,
   registerForLoop,
+  registerIfBlock,
   registerReRenders,
   renderForLoop,
+  renderIfBlock,
   updateProps,
 } from "./methods";
 import {
@@ -40,12 +42,12 @@ export const globalStore = createStore<GlobalStore>(
   subscribeWithSelector(immer(() => ({})))
 );
 
-export { parseJSON, marshallJSON as mashallJSON };
+export { parseJSON, marshallJSON };
 
 export default function Factory<
   T extends StateType,
-  K extends BoundState,
-  L extends BoundState
+  K extends BoundState = BoundState,
+  L extends BoundState = BoundState
 >(name: string, html: string, options?: FactoryOption<T, K, L>) {
   const observedAttributes: string[] = [];
   if (options?.observedAttributes) {
@@ -115,6 +117,7 @@ export default function Factory<
     }
 
     connectedCallback() {
+      registerIfBlock.apply(this);
       registerForLoop.apply(this);
       registerReRenders.apply(this);
 
@@ -150,18 +153,17 @@ export default function Factory<
         if (!targetElement) continue;
 
         switch (type) {
-          case "declaration":
-            targetElement.outerHTML = parseHTMLDeclaration(raw, this.state);
-            break;
           case "loop":
             renderForLoop.apply(this, [raw, targetElement]);
-            targetElement.outerHTML = parseHTMLDeclaration(
-              targetElement.outerHTML,
-              this.state
-            );
             break;
+          case "ifblock":
+            renderIfBlock.apply(this, [pathname, raw, targetElement]);
           default:
         }
+        targetElement.outerHTML = parseHTMLDeclaration(
+          targetElement.outerHTML,
+          this.state
+        );
         reattachEventListeners.apply(this, [id]);
       }
       //@ts-expect-error user provided method
