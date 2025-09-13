@@ -1,6 +1,6 @@
 # Zef-components
 
-A lightweight library for creating reactive web components with state management, declarative templates, and seamless store integration.
+A lightweight library for creating reactive web components with state management, declarative templates, and seamless store integration. Built on Zustand and Immer for optimal state management.
 
 Think of it as "React-at-home" - if your home is a 6kB JS script - or "a less-opinionated AlpineJS" that doesn't break CSP.
 
@@ -8,17 +8,26 @@ Think of it as "React-at-home" - if your home is a 6kB JS script - or "a less-op
 
 - 🔧 **Declarative Templates** - Use Mustache-like syntax for dynamic content
 - ⚡ **Reactive State** - Automatically re-render parts of HTML when state changes
-- 🔄 **State Management** - Global Zustand-powered store integration
+- 🔄 **State Management** - Global Zustand-powered store integration with Immer
 - 🎯 **Event Handling** - Declarative event listener setup
 - 🔁 **Loop Rendering** - Built-in `for-loop` directive for repetitive content
 - 🎨 **Shadow DOM** - Optional shadow DOM support for style encapsulation
 - 🏷️ **TypeScript** - Fully typed with comprehensive type definitions
+- 📦 **Reactive Props** - Component attributes automatically sync with state
+- 🧩 **JSON Support** - Serialize/deserialize objects in templates and attributes
 
 ## Installation
 
 ```bash
 npm install zef-components
 ```
+
+## Dependencies
+
+Zef-components depends on:
+
+- Zustand (^5.0.8) for state management
+- Immer (^10.1.3) for immutable state updates
 
 ## Usage Guide
 
@@ -49,7 +58,7 @@ Factory("my-counter", counterHTML, {
 });
 ```
 
-Build your bundle with esbuild and import it in your html :
+Build your bundle with esbuild and import it in your html:
 
 ```html
 <!DOCTYPE html>
@@ -86,6 +95,17 @@ Values are rendered as follows:
 
 - For primitive values: `state.propertyName?.toString()`
 - For functions: `state.propertyName?.call()?.toString()`
+
+#### JSON Serialization
+
+Serialize objects in templates using the `json::` prefix:
+
+```html
+<div>
+  <p>User data: {{json::user}}</p>
+  <p>Config: {{json::config}}</p>
+</div>
+```
 
 #### Ternary Expressions
 
@@ -129,6 +149,40 @@ Supported collection types:
 - Arrays: iterates through each item
 
 Note: Avoid using `re-render` on or inside `for-loop` directives. For complex reactivity, consider creating separate components.
+
+### Reactive Props
+
+Component attributes can automatically sync with state:
+
+```typescript
+const userCardHTML = `
+  <div>
+    <h2>{{userName}}</h2>
+    <p>Age: {{userAge}}</p>
+    <p>Hobbies: {{userHobbies.name}}</p>
+  </div>
+`;
+
+Factory("user-card", userCardHTML, {
+  props: {
+    userName: "name", // Maps to 'name' attribute
+    userAge: "age", // Maps to 'age' attribute
+    userHobbies: "json::hobbies", // JSON-parsed attribute
+  },
+});
+/*in your html html*/
+```
+Usage in HTML:
+
+```html
+<user-card name="john" age="27" hobbies="{name:'soccer'}"></user-card>;
+```
+Notice that the `hobbies` attribute use `'` as quote (which is not the way the default JSON.stringify function works).
+The library exports two functions that will help you deal with this json formatting :
+```ts
+export declare function parseJSON(json: string | null): any;
+export declare function marshallJSON(obj: any): string;
+```
 
 ### Query Selection
 
@@ -229,53 +283,54 @@ this.$$on(".btn", {
 this.$$off(".btn", "click");
 ```
 
-Note: Because a re-render will replace the element outer html, any event listener attached with addEventListener are lost. **_These Event listeners, however, will be automatically reattached after re-renders._**
+Note: Because a re-render will replace the element outer HTML, any event listener attached with addEventListener will be lost.
 
 ### Global Store Integration
 
-Access and manage global state with Zustand:
+Access and manage global state with Zustand and Immer:
 
 ```typescript
 // External store access
-import { globalStore } from 'zef-components';
+import { globalStore } from "zef-components";
 globalStore.setState({ user: { name: "John" } });
 
 const html = `
 <h1>{{localUser.name}}</h1>
-`
+`;
 
 // Component store binding
 Factory("user-display", html, {
   storeListener: {
-    localUser: "user" // Maps store.user to component state
+    localUser: "user", // Maps store.user to component state
   },
-  onMount(){
-    ...
-    // Internal store access
-      this.$store = { user: { name: "Jane" } };
-  }
+  onMount() {
+    // Internal store access with Immer
+    this.$setStore((store) => {
+      store.user.name = "Jane"; // Immutable update with Immer
+    });
+  },
 });
-
 ```
 
 ## API Reference
 
-### Factory Options (`FactoryOption<T>`)
+### Factory Options (`FactoryOption<T, K, L>`)
 
-| Option               | Type                                                                                | Description                                   |
-| -------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------- |
-| `observedAttributes` | `string[]`                                                                          | Array of attributes to observe for changes    |
-| `value`              | `(this: WebComponent<T>) => any`                                                    | Function that returns the component's value   |
-| `state`              | `T \| ((this: WebComponent<T>) => T)`                                               | Component state object or factory function    |
-| `onMount`            | `(this: WebComponent<T>) => void`                                                   | Lifecycle hook called when component mounts   |
-| `onUnmount`          | `(this: WebComponent<T>) => void`                                                   | Lifecycle hook called when component unmounts |
-| `onRender`           | `(this: WebComponent<T>, path: string) => void`                                     | Hook called after re-rendering                |
-| `onAttributeChanged` | `(this: WebComponent<T>, name: string, oldValue: string, newValue: string) => void` | Called when observed attributes change        |
-| `eventListener`      | `EventListenerRecord<T>`                                                            | Event listener configuration                  |
-| `storeListener`      | `Record<Exclude<string, keyof T>, string>`                                          | Store binding configuration                   |
-| `noShadowRoot`       | `boolean`                                                                           | Disable shadow DOM encapsulation              |
+| Option               | Type                                                                                      | Description                                   |
+| -------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `observedAttributes` | `string[]`                                                                                | Array of attributes to observe for changes    |
+| `value`              | `(this: WebComponent<T, K, L>) => any`                                                    | Function that returns the component's value   |
+| `state`              | `T \| ((this: WebComponent<T, K, L>) => T)`                                               | Component state object or factory function    |
+| `props`              | `L`                                                                                       | Prop binding configuration                    |
+| `onMount`            | `(this: WebComponent<T, K>) => void`                                                      | Lifecycle hook called when component mounts   |
+| `onUnmount`          | `(this: WebComponent<T, K, L>) => void`                                                   | Lifecycle hook called when component unmounts |
+| `onRender`           | `(this: WebComponent<T, K, L>, path: string) => void`                                     | Hook called after re-rendering                |
+| `onAttributeChanged` | `(this: WebComponent<T, K, L>, name: string, oldValue: string, newValue: string) => void` | Called when observed attributes change        |
+| `eventListener`      | `EventListenerRecord`                                                                     | Event listener configuration                  |
+| `storeListener`      | `K`                                                                                       | Store binding configuration                   |
+| `noShadowRoot`       | `boolean`                                                                                 | Disable shadow DOM encapsulation              |
 
-### Component Instance (`WebComponent<T>`)
+### Component Instance (`WebComponent<T, K, L>`)
 
 This object inherits from all the methods of `HTMLElement`, including `remove()`, `getAttribute()`
 
@@ -284,7 +339,8 @@ This object inherits from all the methods of `HTMLElement`, including `remove()`
 | `state`                      | Reactive state object                            |
 | `value`                      | Component's current value                        |
 | `root`                       | Root element (shadow root or element itself)     |
-| `$store`                     | Global store accessor                            |
+| `$getStore()`                | Returns current global store state               |
+| `$setStore(updater)`         | Updates store using Immer producer function      |
 | `$(css)`                     | Query single element                             |
 | `$$(css)`                    | Query multiple elements                          |
 | `$$on(css, eventHandle)`     | Register event listener                          |
@@ -298,18 +354,18 @@ type GlobalStore = {
   [key: string]: any;
 };
 
-type EventListenerRecord<T extends object> = Record<string, EventHandle<T>[]>;
+type EventListenerRecord = Record<string, EventHandle[]>;
 
-type EventHandle<T extends object> = {
+type EventHandle = {
   event: string;
-  handler: (this: WebComponent<T>, ev: Event) => void;
+  handler: (this: WebComponent, ev: Event) => void;
   options?: EventListenerOptions;
 };
 ```
 
-Keys of `EventListenerRecord` are css selectors.
+Keys of `EventListenerRecord` are CSS selectors.
 
-`EventHandle` represent an event listener :
+`EventHandle` represents an event listener:
 
 - `event` is the type of the event to listen to eg. `click`
 - `handler` is the listener, it **_will be bound to the component_**, do not expect `this` to be the event target
@@ -367,11 +423,46 @@ Factory<{ items: { text: string }[] }>("wc-test", todoHTML, {
 });
 ```
 
+### Component with Props and Store
+
+```typescript
+const userProfileHTML = `
+  <div>
+    <h2>{{userName}}</h2>
+    <p>Status: {{userStatus}}</p>
+    <p>Friends: {{json::friends}}</p>
+    <button class="update-status">Update Status</button>
+  </div>
+`;
+
+Factory("user-profile", userProfileHTML, {
+  props: {
+    userName: "name",
+    userStatus: "json::status",
+  },
+  storeListener: {
+    friends: "user.friends",
+  },
+  eventListener: {
+    ".update-status": [
+      {
+        event: "click",
+        handler() {
+          this.$setStore((store) => {
+            store.user.status = "Online";
+          });
+        },
+      },
+    ],
+  },
+});
+```
+
 ## Developer experience
 
 ### Building components
 
-You can use this esbuild config :
+You can use this esbuild config:
 
 ```js
 // esbuild.config.mjs
@@ -398,7 +489,7 @@ if (arg == "dev") {
 }
 ```
 
-Usage :
+Usage:
 
 ```bash
 node esbuild.config.mjs
@@ -408,7 +499,7 @@ node esbuild.config.mjs dev
 
 ### Highlighting and completion
 
-In VSCode you can edit your settings to have a shortcut toggling on and off the html mode :
+In VSCode you can edit your settings to have a shortcut toggling on and off the html mode:
 
 ```json
 // keybindings.json
@@ -429,15 +520,15 @@ In VSCode you can edit your settings to have a shortcut toggling on and off the 
 ]
 ```
 
-There is also this extension : [es6-string-html](https://marketplace.visualstudio.com/items?itemName=Tobermory.es6-string-html). That highlights your string if you place a `/*html*/` before.
+There is also this extension: [es6-string-html](https://marketplace.visualstudio.com/items?itemName=Tobermory.es6-string-html). That highlights your string if you place a `/*html*/` before.
 
 ### Patterns
 
-Here are some patterns that i've found usefull.
+Here are some patterns that I've found useful.
 
 #### Event Handles
 
-Declaring many event handle can be very verbose, I would suggest you define a helper method like :
+Declaring many event handles can be very verbose, I would suggest you define a helper method like:
 
 ```tsx
 const playHandle = (event: string, play: boolean) => ({
@@ -449,7 +540,7 @@ const playHandle = (event: string, play: boolean) => ({
 });
 ```
 
-And then use it like this :
+And then use it like this:
 
 ```ts
 
@@ -477,7 +568,7 @@ Which feels better to me.
 #### Reactive Style
 
 ~~Sometimes~~ Frequently a well placed templated `style` tag might be smarter than relying on the elements style attribute.
-For instance :
+For instance:
 
 ```html
 <div class="record">
@@ -489,12 +580,16 @@ For instance :
 
 Will be challenging to work with the more and more elements share this behavior.
 
-Whereas this looks waaay better, and make it easier to work with complex CSS:
+Whereas this looks way better, and makes it easier to work with complex CSS:
 
 ```html
 <style>
   .modal {
-    opacity : {{open?'1': "0";}}
+    opacity : {
+       {
+        open?'1': "0";
+      }
+    }
   }
 </style>
 <div class="record">
@@ -504,15 +599,15 @@ Whereas this looks waaay better, and make it easier to work with complex CSS:
 </div>
 ```
 
-You don't have to put all your component's style inside a `<style>` tag. You can also import a stylesheet via a `<link>`, and still have a small `<style>` tag with your reactive css rules.
+You don't have to put all your component's style inside a `<style>` tag. You can also import a stylesheet via a `<link>`, and still have a small `<style>` tag with your reactive CSS rules.
 
 #### Working with children
 
-If you have enabled shadow root (the default), all the "light DOM" child of your component will be casted in any unamed `<slot>` tag of your html.
+If you have enabled shadow root (the default), all the "light DOM" children of your component will be casted in any unnamed `<slot>` tag of your HTML.
 
-You can use named slot as well, see [Using templates and slots](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_templates_and_slots).
+You can use named slots as well, see [Using templates and slots](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_templates_and_slots).
 
-If your want to listen to children you'll need to set up a MutationObserver like so.
+If you want to listen to children you'll need to set up a MutationObserver like so.
 
 ```ts
 

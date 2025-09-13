@@ -28,15 +28,19 @@ import {
   BoundState,
 } from "./types";
 import {
+  marshallJSON,
   maybeCall,
   parseDocumentFragment,
   parseHTMLDeclaration,
+  parseJSON,
 } from "./utils";
 
 export const globalStore = createStore<GlobalStore>(
   //@ts-expect-error zustand middleware
   subscribeWithSelector(immer(() => ({})))
 );
+
+export { parseJSON, marshallJSON as mashallJSON };
 
 export default function Factory<
   T extends StateType,
@@ -48,8 +52,11 @@ export default function Factory<
     observedAttributes.push(...options.observedAttributes);
   }
   if (options?.props) {
-    observedAttributes.push(...Object.values(options.props).map(prop => prop.replace("json::", "")));
+    observedAttributes.push(
+      ...Object.values(options.props).map((prop) => prop.replace("json::", ""))
+    );
   }
+
   class Component extends HTMLElement {
     static observedAttributes = observedAttributes;
     state: T & Record<keyof K, () => any> & Record<keyof L, () => string>;

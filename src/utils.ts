@@ -10,12 +10,12 @@ export function parseJSON(json: string | null) {
   try {
     return JSON.parse(json.replaceAll("'", '"'));
   } catch (e) {
-    // console.error(e);
+    console.error(e);
     return null;
   }
 }
 
-function mashallJSON(obj: any) {
+export function marshallJSON(obj: any) {
   return JSON.stringify(obj).replaceAll('"', "'");
 }
 
@@ -73,7 +73,7 @@ export function parseHTMLDeclaration(rawHTML: string, object: StateType) {
       return value ? trueVal : falseVal;
     }
     if ("json" in groups && groups["json"]) {
-      return mashallJSON(value);
+      return marshallJSON(value);
     }
     const rawValue = typeof value === "object" ? unProxyfy(value) : value;
     return rawValue?.toString();
